@@ -62,7 +62,7 @@ EOF
 [dovecot]
 enabled=true
 EOF
-    systemctl restart fail2ban.service
+    service fail2ban restart 
 }
 
 function sethost() {
@@ -122,7 +122,7 @@ function get-certbot() {
 	# If we're using Apache, then restart it to start using the
 	# new certificates -- especially when adding an MTA-STS domain.
 	if check-web | grep apache > /dev/null; then
-	    systemctl restart apache2
+	    service apache2 restart
 	fi
     else
 	# This will start a standalone http server and get the certificate.
@@ -143,7 +143,7 @@ function exim() {
     # Allow authentication of submitted mail via the SASL daemon.
     adduser Debian-exim sasl
     sed -i 's/^START=.*/START=yes/' /etc/default/saslauthd
-    systemctl restart saslauthd.service
+    service saslauthd restart
 
     # Use the Let's Encrypt certificates in exim.
     cat <<EOF > /etc/exim4/conf.d/main/00_tls_macros
@@ -224,7 +224,12 @@ EOF
     # For URIBL (etc.) to work, the requests should come from this
     # host since the free accounts are accounted per IP.
     echo "dns_server 127.0.0.1" >> /etc/spamassassin/local.cf
-    systemctl enable spamassassin.service
+    if which systemctl >/dev/null 2>&1; then
+        systemctl enable spamassassin.service 
+    else
+        rl=`runlevel | awk '{ print $2 }'`
+        update-rc.d enable spamassassin $rl
+    fi
     service spamassassin restart
 
     # Ensure that we're not being an open DNS server.
@@ -324,7 +329,7 @@ function dovecot() {
     service dovecot restart
     # The certificate will change, and dovecot has to reload so that
     # it doesn't expire.
-    echo "20 3 * * 1 systemctl reload dovecot.service" >> \
+    echo "20 3 * * 1 service dovecot reload" >> \
 	 /var/spool/cron/crontabs/root
 }
 
@@ -354,7 +359,7 @@ function mta-sts() {
     else
 	apt -y install apache2
 	a2enmod ssl
-	systemctl restart apache2
+	service apache2 restart
 	web=apache
     fi
 
@@ -395,7 +400,7 @@ function continue-mta-sts() {
 	if [ ! -e 001-mta-sts.conf ]; then
 	    ln -s ../sites-available/001-mta-sts.conf 001-mta-sts.conf
 	fi
-	systemctl restart apache2
+	service apache2 restart
     fi
 }
 
